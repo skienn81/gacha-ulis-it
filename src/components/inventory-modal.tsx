@@ -52,15 +52,16 @@ export function InventoryModal({
   const [copied, setCopied] = useState(false);
   const [showConfirmClear, setShowConfirmClear] = useState(false);
 
+  // Tính toán tỉ lệ % rơi thực tế của từng món quà dựa trên số lần buff và trạng thái 6 sao
+  // Phải gọi HOOK ở mức cao nhất, KHÔNG ĐƯỢC đặt sau if (!isOpen) return null
+  const chances = useMemo(() => {
+    return calculatePrizeChances(PRIZES, buffCounts, isSixStarClaimed);
+  }, [buffCounts, isSixStarClaimed]);
+
   if (!isOpen) return null;
 
   // Danh sách quà thực tế có thể quay trúng
   const validPrizes = PRIZES.filter(p => !p.isTeaser && p.weight > 0);
-
-  // Tính toán tỉ lệ % rơi thực tế của từng món quà dựa trên số lần buff và trạng thái 6 sao
-  const chances = useMemo(() => {
-    return calculatePrizeChances(PRIZES, buffCounts, isSixStarClaimed);
-  }, [buffCounts, isSixStarClaimed]);
 
   // Tính toán thống kê theo 6 bậc sao
   const totalSpins = history.length;
@@ -68,11 +69,14 @@ export function InventoryModal({
   const itemCounts = new Map<string, number>();
 
   history.forEach(item => {
-    const tier = item.rarity ?? (item.stars - 1);
+    if (!item) return;
+    const tier = item.rarity ?? (item.stars ? item.stars - 1 : 0);
     if (tier >= 0 && tier < 6) {
       tierCounts[tier]++;
     }
-    itemCounts.set(item.prizeId, (itemCounts.get(item.prizeId) || 0) + 1);
+    if (item.prizeId) {
+      itemCounts.set(item.prizeId, (itemCounts.get(item.prizeId) || 0) + 1);
+    }
   });
 
   const handleCopyReport = () => {
@@ -111,7 +115,7 @@ export function InventoryModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#050c1a]/85 backdrop-blur-md p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-[#050c1a]/85 backdrop-blur-md p-4">
       <div className="relative w-full max-w-3xl max-h-[92vh] flex flex-col bg-[#0e1d3b] border border-[#2b4982] rounded-3xl shadow-2xl overflow-hidden text-slate-100">
         {/* Header ULIS IT */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#244177] bg-[#0c1832]">
@@ -447,36 +451,41 @@ export function InventoryModal({
                   <p className="text-xs text-slate-500 mt-1">Các lượt quay trúng quà sẽ tự động lưu vào đây.</p>
                 </div>
               ) : (
-                history.map((item, index) => (
-                  <div
-                    key={item.id || index}
-                    className="flex items-center justify-between p-2.5 rounded-xl border bg-[#112244]/60 text-xs"
-                    style={{ borderColor: `${TIER_COLORS[item.rarity]}33` }}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border"
-                        style={{
-                          backgroundColor: `${TIER_COLORS[item.rarity]}25`,
-                          borderColor: `${TIER_COLORS[item.rarity]}55`,
-                          color: TIER_COLORS[item.rarity],
-                        }}
-                      >
-                        <CelestialStar size={16} color={TIER_COLORS[item.rarity]} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-white truncate">{item.name}</span>
-                          <StarRating count={item.stars} size={10} color={TIER_COLORS[item.rarity]} />
+                history.map((item, index) => {
+                  const rarity = item.rarity ?? (item.stars ? item.stars - 1 : 0);
+                  const color = TIER_COLORS[rarity] || '#38bdf8';
+                  const stars = item.stars || (rarity + 1);
+                  return (
+                    <div
+                      key={item.id || index}
+                      className="flex items-center justify-between p-2.5 rounded-xl border bg-[#112244]/60 text-xs"
+                      style={{ borderColor: `${color}33` }}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border"
+                          style={{
+                            backgroundColor: `${color}25`,
+                            borderColor: `${color}55`,
+                            color: color,
+                          }}
+                        >
+                          <CelestialStar size={16} color={color} />
                         </div>
-                        <span className="text-[10px] text-slate-400 truncate block">{item.sub}</span>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-white truncate">{item.name}</span>
+                            <StarRating count={stars} size={10} color={color} />
+                          </div>
+                          <span className="text-[10px] text-slate-400 truncate block">{item.sub}</span>
+                        </div>
                       </div>
+                      <span className="text-slate-400 font-mono text-[11px] shrink-0 ml-2">
+                        {item.timestamp ? new Date(item.timestamp).toLocaleTimeString('vi-VN') : ''}
+                      </span>
                     </div>
-                    <span className="text-slate-400 font-mono text-[11px] shrink-0 ml-2">
-                      {new Date(item.timestamp).toLocaleTimeString('vi-VN')}
-                    </span>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           )}
